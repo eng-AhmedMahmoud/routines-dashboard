@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an idea or enhancement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What's your proposed solution?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - I read CONTRIBUTING.md and this fits the local-first scope
+        - I'd like to discuss whether this fits scope
+    validations:
+      required: true
