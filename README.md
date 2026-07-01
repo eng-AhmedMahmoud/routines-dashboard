@@ -132,7 +132,7 @@ The dashboard reads your Claude Code OAuth token from the macOS Keychain at requ
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+GPLv3 — see [LICENSE](./LICENSE). Copyleft: forks and derivatives must ship their source under GPLv3.
 
 ## Acknowledgements
 
