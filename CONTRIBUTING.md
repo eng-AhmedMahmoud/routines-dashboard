@@ -24,7 +24,7 @@ The launchd pane works out of the box. The cloud pane needs Claude Code logged i
 
 ## Good first issues
 
-Look for the [`good first issue`](https://github.com/eng-AhmedMahmoud/routines-dashboard/labels/good%20first%20issue) label. Concrete examples that already qualify:
+Look for the [`good first issue`](../../labels/good%20first%20issue) label. Concrete examples that already qualify:
 
 - Add a "next 5 runs" preview for cron expressions
 - Add a light theme

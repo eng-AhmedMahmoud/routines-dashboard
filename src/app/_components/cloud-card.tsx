@@ -69,7 +69,9 @@ export function CloudCard({
     : trigger.run_once_at
     ? `once at ${trigger.run_once_at}`
     : "manual";
-  const nextRun = trigger.next_run_at ? new Date(trigger.next_run_at).toLocaleString() : "—";
+  const nextRun = trigger.next_run_at
+    ? new Date(trigger.next_run_at).toLocaleString("en-GB", { hour12: false })
+    : "—";
 
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--card)]">

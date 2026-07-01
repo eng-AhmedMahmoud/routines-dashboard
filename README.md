@@ -41,7 +41,7 @@ Requirements:
 - Claude Code CLI logged in (only if you want the cloud routines pane; the launchd pane works without it)
 
 ```bash
-git clone https://github.com/eng-AhmedMahmoud/routines-dashboard.git
+git clone https://github.com/OWNER/routines-dashboard.git
 cd routines-dashboard
 pnpm install
 
@@ -55,6 +55,38 @@ pnpm dev
 ```
 
 The dashboard auto-discovers every plist in `~/Library/LaunchAgents/`. If you've authenticated Claude Code (`claude login`), the cloud pane fills in automatically using the OAuth token from your Keychain.
+
+## Native Mac app (optional)
+
+Prefer clicking an icon in the Dock over `pnpm start` in a terminal? Install a WKWebView wrapper as a real `.app` bundle:
+
+```bash
+./scripts/install-mac-app.sh
+# → /Applications/Routines Dashboard.app
+```
+
+The installer builds a tiny native launcher (~90 KB Swift binary) that:
+- checks whether the dashboard server is already running,
+- runs `pnpm build && pnpm start` (via `portless` if installed) if it isn't,
+- opens a native window pointed at the dashboard.
+
+Parameterize with env vars: `APP_NAME`, `URL`, `PORTLESS_NAME`, `PROJECT_DIR`, `INSTALL_DIR`. Requires Xcode Command Line Tools (`xcode-select --install`).
+
+## Headless routine runner (optional)
+
+If your `launchd` scripts currently open a terminal window (Ghostty, iTerm, Terminal.app) to run `claude`, `scripts/claude-cl.sh` is a drop-in headless replacement:
+
+```bash
+mkdir -p ~/bin && cp scripts/claude-cl.sh ~/bin/ && chmod +x ~/bin/claude-cl.sh
+```
+
+Then in your run scripts:
+
+```bash
+"$HOME/bin/claude-cl.sh" "$PROJECT_DIR" "$PROMPT_FILE" >> "$LOG" 2>&1
+```
+
+No terminal window pops up on scheduled runs. Set `CLAUDE_CL_DETACH=1` if you want fire-and-forget.
 
 ## How it works
 
@@ -88,7 +120,7 @@ The dashboard auto-discovers every plist in `~/Library/LaunchAgents/`. If you've
 - [ ] Homebrew formula + auto-launchd for the dashboard itself
 - [ ] Light theme
 
-See [open issues](https://github.com/eng-AhmedMahmoud/routines-dashboard/issues) for current ideas and pick a [`good first issue`](https://github.com/eng-AhmedMahmoud/routines-dashboard/labels/good%20first%20issue) if you want to jump in.
+See [open issues](../../issues) for current ideas and pick a [`good first issue`](../../labels/good%20first%20issue) if you want to jump in.
 
 ## Contributing
 

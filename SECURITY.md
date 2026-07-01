@@ -2,14 +2,14 @@
 
 ## Reporting a vulnerability
 
-If you find a security issue, please email **ahmed.bis.iti@gmail.com** with:
+If you find a security issue, please [open a private security advisory](../../security/advisories/new) on GitHub with:
 
 - A description of the issue
 - Steps to reproduce
 - The impact (what an attacker could do)
 - Any suggested fix
 
-I'll acknowledge within 72 hours and aim to ship a patch within 7 days for high-severity issues.
+Maintainers will acknowledge within 72 hours and aim to ship a patch within 7 days for high-severity issues.
 
 **Please do not** open a public GitHub issue for security reports.
 
