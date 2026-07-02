@@ -40,7 +40,14 @@ export function RoutinesView({
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchFeedback, setBatchFeedback] = useState<string | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
   const [isRefreshing, startRefresh] = useTransition();
+
+  const exitBatch = () => {
+    setBatchMode(false);
+    setSelection(new Set());
+    setBatchFeedback(null);
+  };
 
   const refresh = () => {
     startRefresh(async () => {
@@ -260,6 +267,17 @@ export function RoutinesView({
           >
             {isRefreshing ? "…" : "Refresh"}
           </button>
+          <button
+            onClick={() => (batchMode ? exitBatch() : setBatchMode(true))}
+            className={`shrink-0 rounded-lg border px-4 py-2 text-base font-medium transition-colors ${
+              batchMode
+                ? "border-[var(--accent)]/50 bg-[var(--accent)]/12 text-[var(--accent)]"
+                : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--card-hover)]"
+            }`}
+            title={batchMode ? "Exit batch mode" : "Enable batch mode to select multiple routines"}
+          >
+            {batchMode ? "Done" : "Batch update"}
+          </button>
         </div>
       </div>
 
@@ -274,16 +292,18 @@ export function RoutinesView({
             <span className="chip-count">{c.count}</span>
           </button>
         ))}
-        <button
-          onClick={selectAllVisible}
-          className="chip ml-auto"
-          title="Select every routine matching current filters"
-        >
-          Select visible
-        </button>
+        {batchMode && (
+          <button
+            onClick={selectAllVisible}
+            className="chip ml-auto"
+            title="Select every routine matching current filters"
+          >
+            Select visible
+          </button>
+        )}
       </div>
 
-      {selection.size > 0 && (
+      {batchMode && selection.size > 0 && (
         <div className="batch-bar fade-in flex flex-wrap items-center gap-2 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/8 px-3 py-2">
           <span className="text-sm font-medium">
             <span className="text-[var(--accent)]">{selection.size}</span> selected
@@ -360,7 +380,9 @@ export function RoutinesView({
               onChange={refresh}
               onMetaChange={refreshMetadataOnly}
               selected={selection.has(selKey({ kind: "launchd", label: a.label }))}
-              onToggleSelect={() => toggle({ kind: "launchd", label: a.label })}
+              onToggleSelect={
+                batchMode ? () => toggle({ kind: "launchd", label: a.label }) : undefined
+              }
             />
           ))}
         </Section>
@@ -381,7 +403,9 @@ export function RoutinesView({
               onChange={refresh}
               onMetaChange={refreshMetadataOnly}
               selected={selection.has(selKey({ kind: "cloud", id: t.id }))}
-              onToggleSelect={() => toggle({ kind: "cloud", id: t.id })}
+              onToggleSelect={
+                batchMode ? () => toggle({ kind: "cloud", id: t.id }) : undefined
+              }
             />
           ))}
         </Section>

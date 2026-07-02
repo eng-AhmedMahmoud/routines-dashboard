@@ -100,12 +100,15 @@ export function CloudCard({
     >
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
         {onToggleSelect && (
-          <label className="mt-0.5 shrink-0 cursor-pointer sm:mt-1.5" title="Select">
+          <label
+            className="batch-slot mt-0.5 shrink-0 cursor-pointer sm:mt-1.5"
+            title="Select"
+          >
             <input
               type="checkbox"
+              className="batch-check"
               checked={selected}
               onChange={onToggleSelect}
-              className="h-4 w-4 accent-[var(--accent)]"
             />
           </label>
         )}
