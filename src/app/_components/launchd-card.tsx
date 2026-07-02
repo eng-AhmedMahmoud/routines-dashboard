@@ -1,10 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { LaunchdAgent, Schedule } from "@/lib/launchd";
 import type { RoutineMetadata } from "@/lib/metadata";
 import { LogPanel } from "./log-panel";
 import { MetaEditor } from "./meta-editor";
+
+type RunEvent = { ts: string; status: "ok" | "fail" | "unknown"; exitCode: number | null; durationMs: number | null };
+
+function formatDur(ms: number | null): string {
+  if (ms === null) return "?";
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.round(ms / 60_000)}m`;
+}
 
 export function LaunchdCard({
   agent,
@@ -24,6 +33,22 @@ export function LaunchdCard({
   const [hour, setHour] = useState(getFirstSchedule(agent.schedule)?.hour ?? 9);
   const [minute, setMinute] = useState(getFirstSchedule(agent.schedule)?.minute ?? 0);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [runs, setRuns] = useState<RunEvent[] | null>(null);
+
+  useEffect(() => {
+    if (!agent.stdoutPath) return;
+    let alive = true;
+    fetch(`/api/launchd/${labelEnc}/history`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        if (Array.isArray(d.runs)) setRuns(d.runs);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [agent.stdoutPath, agent.pid, agent.lastExitStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const displayName = meta?.display_name || agent.label;
   const isAliased = !!meta?.display_name && meta.display_name !== agent.label;
@@ -60,21 +85,22 @@ export function LaunchdCard({
   const scheduleText = describeSchedule(agent.schedule, agent.startInterval);
   const programText = agent.programArguments[0] ? truncateMid(agent.programArguments[0], 70) : "—";
 
+  const failed = agent.lastExitStatus !== null && agent.lastExitStatus !== 0;
+  const dotClass = failed ? "status-fail" : agent.enabled ? "status-on" : "status-off";
+  const dotTitle = failed ? `failed (exit ${agent.lastExitStatus})` : agent.enabled ? "loaded" : "unloaded";
+
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] transition-colors">
+    <div className="card-lift rounded-lg border border-[var(--border)] bg-[var(--card)]">
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
         <span
-          title={agent.enabled ? "loaded" : "unloaded"}
-          className={`hidden h-2.5 w-2.5 shrink-0 rounded-full sm:mt-2 sm:inline-block ${
-            agent.enabled ? "bg-[var(--green)]" : "bg-[var(--muted)]"
-          }`}
+          title={dotTitle}
+          className={`status-dot ${dotClass} hidden sm:mt-2 sm:inline-block`}
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full sm:hidden ${
-                agent.enabled ? "bg-[var(--green)]" : "bg-[var(--muted)]"
-              }`}
+              title={dotTitle}
+              className={`status-dot ${dotClass} sm:hidden`}
             />
             <span className="break-all text-base font-semibold leading-tight">{displayName}</span>
             <span className="rounded bg-[var(--border)] px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-[var(--muted)]">
@@ -109,6 +135,28 @@ export function LaunchdCard({
             )}
             <span className="break-all font-mono text-xs opacity-70">{programText}</span>
           </div>
+          {runs && runs.length > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="run-strip">
+                {Array.from({ length: 10 }).map((_, i) => {
+                  const idx = runs.length - 10 + i;
+                  const r = idx >= 0 ? runs[idx] : null;
+                  const cls = !r
+                    ? "run-unknown"
+                    : r.status === "ok"
+                    ? "run-ok"
+                    : r.status === "fail"
+                    ? "run-fail"
+                    : "run-unknown";
+                  const title = r
+                    ? `${new Date(r.ts).toLocaleString("en-GB", { hour12: false })} · ${r.status}${r.exitCode !== null ? ` (exit ${r.exitCode})` : ""}${r.durationMs !== null ? ` · ${formatDur(r.durationMs)}` : ""}`
+                    : "no data";
+                  return <span key={i} className={`run-dot ${cls}`} title={title} />;
+                })}
+              </span>
+              <span className="text-xs text-[var(--muted)]">last {runs.length} runs</span>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           {feedback && (

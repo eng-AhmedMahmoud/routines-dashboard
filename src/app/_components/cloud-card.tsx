@@ -1,9 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import cronstrue from "cronstrue";
 import type { CloudTrigger } from "@/lib/cloud";
 import type { RoutineMetadata } from "@/lib/metadata";
 import { MetaEditor } from "./meta-editor";
+
+function humanizeCron(expr: string | null | undefined): string | null {
+  if (!expr) return null;
+  try {
+    return cronstrue.toString(expr, { verbose: false, use24HourTimeFormat: true });
+  } catch {
+    return null;
+  }
+}
 
 export function CloudCard({
   trigger,
@@ -64,7 +74,10 @@ export function CloudCard({
     startBusy(() => post(`/api/cloud/${trigger.id}/delete`, {}));
   };
 
-  const scheduleText = trigger.cron_expression
+  const cronHuman = humanizeCron(trigger.cron_expression);
+  const scheduleText = cronHuman
+    ? cronHuman
+    : trigger.cron_expression
     ? `cron ${trigger.cron_expression}`
     : trigger.run_once_at
     ? `once at ${trigger.run_once_at}`
@@ -73,21 +86,15 @@ export function CloudCard({
     ? new Date(trigger.next_run_at).toLocaleString("en-GB", { hour12: false })
     : "—";
 
+  const dotClass = trigger.enabled ? "status-on" : "status-off";
+
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--card)]">
+    <div className="card-lift rounded-lg border border-[var(--border)] bg-[var(--card)]">
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
-        <span
-          className={`hidden h-2.5 w-2.5 shrink-0 rounded-full sm:mt-2 sm:inline-block ${
-            trigger.enabled ? "bg-[var(--green)]" : "bg-[var(--muted)]"
-          }`}
-        />
+        <span className={`status-dot ${dotClass} hidden sm:mt-2 sm:inline-block`} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full sm:hidden ${
-                trigger.enabled ? "bg-[var(--green)]" : "bg-[var(--muted)]"
-              }`}
-            />
+            <span className={`status-dot ${dotClass} sm:hidden`} />
             <span className="text-base font-semibold leading-tight">{displayName}</span>
             <span className="rounded bg-[var(--purple)]/15 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-[var(--purple)]">
               cloud
