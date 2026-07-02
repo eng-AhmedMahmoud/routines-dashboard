@@ -8,17 +8,20 @@ import { LaunchdCard } from "./launchd-card";
 import { CloudCard } from "./cloud-card";
 
 type Tab = "all" | "local" | "cloud";
+type StatusFilter = "any" | "enabled" | "disabled" | "failing";
 
 export function RoutinesView({
   initialAgents,
   initialTriggers,
   initialMetadata,
   initialErrors,
+  cloudEnabled = false,
 }: {
   initialAgents: LaunchdAgent[];
   initialTriggers: CloudTrigger[];
   initialMetadata: Record<string, RoutineMetadata>;
   initialErrors: { launchd: string | null; cloud: string | null };
+  cloudEnabled?: boolean;
 }) {
   const [agents, setAgents] = useState(initialAgents);
   const [triggers, setTriggers] = useState(initialTriggers);
@@ -26,13 +29,16 @@ export function RoutinesView({
   const [errors, setErrors] = useState(initialErrors);
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("any");
   const [isRefreshing, startRefresh] = useTransition();
 
   const refresh = () => {
     startRefresh(async () => {
       const [agentsRes, triggersRes, metaRes] = await Promise.all([
         fetch("/api/launchd/list", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/cloud/list", { cache: "no-store" }).then((r) => r.json()),
+        cloudEnabled
+          ? fetch("/api/cloud/list", { cache: "no-store" }).then((r) => r.json())
+          : Promise.resolve({ triggers: [], error: null }),
         fetch("/api/metadata", { cache: "no-store" }).then((r) => r.json()),
       ]);
       if (agentsRes.agents) setAgents(agentsRes.agents);
@@ -40,7 +46,7 @@ export function RoutinesView({
       if (metaRes.items) setMetadata(metaRes.items);
       setErrors({
         launchd: agentsRes.error || null,
-        cloud: triggersRes.error || null,
+        cloud: cloudEnabled ? triggersRes.error || null : null,
       });
     });
   };
@@ -56,43 +62,71 @@ export function RoutinesView({
     (meta?.display_name || "").toLowerCase().includes(q) ||
     (meta?.description || "").toLowerCase().includes(q);
 
-  const filteredAgents = agents.filter((a) =>
-    matchesQuery(a.label, metadata[`launchd:${a.label}`])
-  );
-  const filteredTriggers = triggers.filter(
-    (t) =>
+  const passesStatus = (enabled: boolean, failing: boolean): boolean => {
+    if (status === "any") return true;
+    if (status === "enabled") return enabled;
+    if (status === "disabled") return !enabled;
+    if (status === "failing") return failing;
+    return true;
+  };
+
+  const filteredAgents = agents.filter((a) => {
+    if (!matchesQuery(a.label, metadata[`launchd:${a.label}`])) return false;
+    const failing = a.lastExitStatus !== null && a.lastExitStatus !== 0;
+    return passesStatus(a.enabled, failing);
+  });
+  const filteredTriggers = triggers.filter((t) => {
+    const matches =
       matchesQuery(t.name, metadata[`cloud:${t.id}`]) ||
       t.id.toLowerCase().includes(q) ||
-      (t.cron_expression || "").toLowerCase().includes(q)
-  );
+      (t.cron_expression || "").toLowerCase().includes(q);
+    if (!matches) return false;
+    return passesStatus(t.enabled, false);
+  });
+
+  const counts = {
+    any: agents.length + triggers.length,
+    enabled: agents.filter((a) => a.enabled).length + triggers.filter((t) => t.enabled).length,
+    disabled: agents.filter((a) => !a.enabled).length + triggers.filter((t) => !t.enabled).length,
+    failing: agents.filter((a) => a.lastExitStatus !== null && a.lastExitStatus !== 0).length,
+  };
+  const statusChips: { key: StatusFilter; label: string; count: number }[] = [
+    { key: "any", label: "All", count: counts.any },
+    { key: "enabled", label: "Enabled", count: counts.enabled },
+    { key: "disabled", label: "Disabled", count: counts.disabled },
+    { key: "failing", label: "Failing", count: counts.failing },
+  ];
 
   const showLocal = tab !== "cloud";
-  const showCloud = tab !== "local";
+  const showCloud = cloudEnabled && tab !== "local";
+  const tabs: Tab[] = cloudEnabled ? ["all", "local", "cloud"] : ["all"];
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex shrink-0 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1">
-          {(["all", "local", "cloud"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none sm:text-base ${
-                tab === t
-                  ? "bg-[var(--card-hover)] text-[var(--text)]"
-                  : "text-[var(--muted)] hover:text-[var(--text)]"
-              }`}
-            >
-              {t === "all" ? "All" : t === "local" ? "Local" : "Cloud"}
-            </button>
-          ))}
-        </div>
+        {cloudEnabled && (
+          <div className="flex shrink-0 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1">
+            {tabs.map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none sm:text-base ${
+                  tab === t
+                    ? "bg-[var(--card-hover)] text-[var(--text)]"
+                    : "text-[var(--muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                {t === "all" ? "All" : t === "local" ? "Local" : "Cloud"}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 sm:flex-1">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter by name, description, tag…"
-            className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-base placeholder:text-[var(--muted)] focus:border-[var(--blue)] focus:outline-none"
+            className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-base placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:outline-none"
           />
           <button
             onClick={refresh}
@@ -102,6 +136,19 @@ export function RoutinesView({
             {isRefreshing ? "…" : "Refresh"}
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 fade-in">
+        {statusChips.map((c) => (
+          <button
+            key={c.key}
+            onClick={() => setStatus(c.key)}
+            className={`chip ${status === c.key ? "chip-active" : ""}`}
+          >
+            {c.label}
+            <span className="chip-count">{c.count}</span>
+          </button>
+        ))}
       </div>
 
       {showLocal && (
