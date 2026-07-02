@@ -72,6 +72,35 @@ The installer builds a tiny native launcher (~90 KB Swift binary) that:
 
 Parameterize with env vars: `APP_NAME`, `URL`, `PORTLESS_NAME`, `PROJECT_DIR`, `INSTALL_DIR`. Requires Xcode Command Line Tools (`xcode-select --install`).
 
+## n8n integration (optional)
+
+Each routine can carry an **n8n webhook URL** in its metadata. Set it via the pencil (✎) button on any card. When you Fire that routine — from the dashboard or via schedule — the backend POSTs a JSON payload to the URL, so n8n can chain workflows off it (Slack notify, log to Sheets, PagerDuty on failure, etc.).
+
+Payload (fire-and-forget, 5s timeout, no auth — relies on webhook URL secrecy):
+
+```json
+{
+  "event": "fire",
+  "kind": "launchd",
+  "label": "com.ahmedmahmoud.linkedin-daily-apply",
+  "source": "dashboard",
+  "timestamp": "2026-07-02T15:30:00.000Z"
+}
+```
+
+Errors are logged to the server console and swallowed — a broken n8n hook never breaks `launchctl start`.
+
+### Inbound: trigger a routine from n8n
+
+The dashboard's existing Fire endpoint is already a webhook. Any n8n HTTP Request node can hit it:
+
+```
+POST https://routines.localhost/api/launchd/<url-encoded-label>/fire
+POST https://routines.localhost/api/cloud/<trigger-id>/fire
+```
+
+Body optional (`{"text": "..."}` for cloud). This is why dashboard + n8n form a bidirectional link with zero glue code.
+
 ## Headless routine runner (optional)
 
 If your `launchd` scripts currently open a terminal window (Ghostty, iTerm, Terminal.app) to run `claude`, `scripts/claude-cl.sh` is a drop-in headless replacement:
