@@ -87,9 +87,11 @@ body::before {
 }
 
 /* --- Status dots — soft pulse for enabled ------------------------------- */
+/* Display is controlled by the Tailwind utility on the element so that
+   `hidden sm:inline-block` can hide/show at breakpoints. Setting display
+   here would win the cascade and leave both dots visible at once. */
 .status-dot {
   position: relative;
-  display: inline-block;
   width: 0.625rem;
   height: 0.625rem;
   border-radius: 9999px;

@@ -20,11 +20,15 @@ export function CloudCard({
   meta,
   onChange,
   onMetaChange,
+  selected = false,
+  onToggleSelect,
 }: {
   trigger: CloudTrigger;
   meta?: RoutineMetadata;
   onChange: () => void;
   onMetaChange: () => void;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const [busy, startBusy] = useTransition();
   const [editing, setEditing] = useState(false);
@@ -89,12 +93,36 @@ export function CloudCard({
   const dotClass = trigger.enabled ? "status-on" : "status-off";
 
   return (
-    <div className="card-lift rounded-lg border border-[var(--border)] bg-[var(--card)]">
+    <div
+      className={`card-lift rounded-lg border bg-[var(--card)] ${
+        selected ? "border-[var(--accent)]/60 shadow-[0_0_0_1px_var(--accent)]/30" : "border-[var(--border)]"
+      }`}
+    >
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
-        <span className={`status-dot ${dotClass} hidden sm:mt-2 sm:inline-block`} />
+        {onToggleSelect && (
+          <label className="mt-1.5 hidden shrink-0 cursor-pointer sm:block" title="Select">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggleSelect}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+          </label>
+        )}
+        <span className={`status-dot ${dotClass} hidden sm:mt-2 sm:inline-block`} aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`status-dot ${dotClass} sm:hidden`} />
+            {onToggleSelect && (
+              <label className="cursor-pointer sm:hidden" title="Select">
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={onToggleSelect}
+                  className="h-4 w-4 accent-[var(--accent)]"
+                />
+              </label>
+            )}
+            <span className={`status-dot ${dotClass} inline-block sm:hidden`} />
             <span className="text-base font-semibold leading-tight">{displayName}</span>
             <span className="rounded bg-[var(--purple)]/15 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-[var(--purple)]">
               cloud
