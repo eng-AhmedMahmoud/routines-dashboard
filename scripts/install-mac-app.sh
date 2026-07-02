@@ -146,19 +146,72 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         window.setFrameAutosaveName("\(APP_TITLE)-MainWindow")
         window.tabbingMode = .disallowed
 
+        // Nonpersistent data store — no cross-launch cache. Prevents the
+        // window from showing stale HTML after the underlying dev server
+        // has rebuilt.
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
+        config.websiteDataStore = .nonPersistent()
         webView = WKWebView(frame: contentRect, configuration: config)
         webView.autoresizingMask = [.width, .height]
         webView.navigationDelegate = self
         webView.allowsBackForwardNavigationGestures = true
         window.contentView = webView
 
-        if let url = URL(string: URL_STRING) {
-            webView.load(URLRequest(url: url))
-        }
+        loadFresh()
+        installMenu()
+
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(reload),
+            name: NSApplication.didBecomeActiveNotification, object: nil
+        )
+    }
+
+    func loadFresh() {
+        guard let url = URL(string: URL_STRING) else { return }
+        var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        webView.load(req)
+    }
+
+    @objc func reload() { loadFresh() }
+
+    func installMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu()
+        appMenu.addItem(NSMenuItem(title: "About \(APP_TITLE)", action: #selector(NSApp.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+        appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(NSMenuItem(title: "Hide \(APP_TITLE)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+        appMenu.addItem(NSMenuItem(title: "Quit \(APP_TITLE)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appMenuItem.submenu = appMenu
+
+        let viewMenuItem = NSMenuItem()
+        mainMenu.addItem(viewMenuItem)
+        let viewMenu = NSMenu(title: "View")
+        let reloadItem = NSMenuItem(title: "Reload", action: #selector(reload), keyEquivalent: "r")
+        reloadItem.target = self
+        viewMenu.addItem(reloadItem)
+        let hardReloadItem = NSMenuItem(title: "Reload (Bypass Cache)", action: #selector(reload), keyEquivalent: "R")
+        hardReloadItem.keyEquivalentModifierMask = [.command, .shift]
+        hardReloadItem.target = self
+        viewMenu.addItem(hardReloadItem)
+        viewMenuItem.submenu = viewMenu
+
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        editMenu.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        editMenu.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        editMenuItem.submenu = editMenu
+
+        NSApp.mainMenu = mainMenu
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
