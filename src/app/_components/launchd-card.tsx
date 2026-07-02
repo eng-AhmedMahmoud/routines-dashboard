@@ -101,7 +101,7 @@ export function LaunchdCard({
     >
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
         {onToggleSelect && (
-          <label className="mt-1.5 hidden shrink-0 cursor-pointer sm:block" title="Select">
+          <label className="mt-0.5 shrink-0 cursor-pointer sm:mt-1.5" title="Select">
             <input
               type="checkbox"
               checked={selected}
@@ -112,25 +112,11 @@ export function LaunchdCard({
         )}
         <span
           title={dotTitle}
-          className={`status-dot ${dotClass} hidden sm:mt-2 sm:inline-block`}
-          aria-hidden
+          className={`status-dot ${dotClass} mt-1.5 shrink-0 sm:mt-2`}
+          style={{ display: "inline-block" }}
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {onToggleSelect && (
-              <label className="cursor-pointer sm:hidden" title="Select">
-                <input
-                  type="checkbox"
-                  checked={selected}
-                  onChange={onToggleSelect}
-                  className="h-4 w-4 accent-[var(--accent)]"
-                />
-              </label>
-            )}
-            <span
-              title={dotTitle}
-              className={`status-dot ${dotClass} inline-block sm:hidden`}
-            />
             <span className="break-all text-base font-semibold leading-tight">{displayName}</span>
             <span className="rounded bg-[var(--border)] px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-[var(--muted)]">
               launchd
