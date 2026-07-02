@@ -124,6 +124,43 @@ export async function fireAgent(label: string): Promise<void> {
   await execFileP("launchctl", ["start", label]);
 }
 
+async function osNotify(title: string, message: string): Promise<void> {
+  try {
+    const safeTitle = title.replace(/["\\]/g, "");
+    const safeMsg = message.replace(/["\\]/g, "");
+    await execFileP("osascript", [
+      "-e",
+      `display notification "${safeMsg}" with title "${safeTitle}" sound name "Basso"`,
+    ]);
+  } catch {
+    // silent
+  }
+}
+
+// Poll launchctl list for a fired agent for up to `timeoutMs`. Fires a macOS
+// notification if the agent exits non-zero. Non-blocking (fire-and-forget).
+export function watchFireOutcome(label: string, timeoutMs = 60_000): void {
+  const start = Date.now();
+  const intervalMs = 2_000;
+  let lastPid: number | null = null;
+
+  const tick = async () => {
+    const info = await launchctlList(label);
+    if (info.pid !== null) lastPid = info.pid;
+
+    // Post-run: pid gone, we've seen an exit status
+    if (info.pid === null && info.lastExitStatus !== null && info.lastExitStatus !== 0 && lastPid !== null) {
+      await osNotify(`Routine failed: ${label}`, `Exited ${info.lastExitStatus}`);
+      return;
+    }
+
+    if (Date.now() - start >= timeoutMs) return;
+    setTimeout(tick, intervalMs);
+  };
+
+  setTimeout(tick, intervalMs);
+}
+
 export async function setEnabled(label: string, enabled: boolean): Promise<void> {
   const agent = await getAgent(label);
   if (!agent) throw new Error(`agent not found: ${label}`);
