@@ -132,6 +132,14 @@ export function LaunchdCard({
                 {t}
               </span>
             ))}
+            {meta?.n8n_webhook_url && (
+              <span
+                className="rounded bg-[var(--purple)]/15 px-1.5 py-0.5 text-[11px] font-medium text-[var(--purple)]"
+                title={`Fires POST to ${meta.n8n_webhook_url}`}
+              >
+                → n8n
+              </span>
+            )}
             {agent.pid !== null && (
               <span className="rounded bg-[var(--blue)]/15 px-1.5 py-0.5 text-[11px] font-medium text-[var(--blue)]">
                 pid {agent.pid}
@@ -145,6 +153,17 @@ export function LaunchdCard({
           </div>
           {meta?.description && (
             <p className="mt-1 text-sm text-[var(--text)]/80">{meta.description}</p>
+          )}
+          {meta?.detailed_description && (
+            <details className="mt-1.5 group">
+              <summary className="cursor-pointer list-none text-xs font-medium text-[var(--accent)] hover:underline">
+                <span className="inline-block transition-transform group-open:rotate-90">▸</span>{" "}
+                Details
+              </summary>
+              <pre className="mt-1.5 whitespace-pre-wrap rounded border border-[var(--border)] bg-[var(--bg-elevated)] p-3 font-mono text-xs leading-relaxed text-[var(--text)]/85">
+                {meta.detailed_description}
+              </pre>
+            </details>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-[var(--muted)]">
             <span className="font-medium">{scheduleText}</span>

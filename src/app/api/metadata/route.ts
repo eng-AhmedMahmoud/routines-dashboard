@@ -13,7 +13,9 @@ export async function PUT(req: Request) {
     key?: string;
     display_name?: string;
     description?: string;
+    detailed_description?: string;
     tags?: string[];
+    n8n_webhook_url?: string;
   };
   if (!body.key) {
     return NextResponse.json({ error: "key required" }, { status: 400 });
@@ -21,7 +23,9 @@ export async function PUT(req: Request) {
   await setMeta(body.key, {
     display_name: body.display_name,
     description: body.description,
+    detailed_description: body.detailed_description,
     tags: body.tags,
+    n8n_webhook_url: body.n8n_webhook_url,
   });
   return NextResponse.json({ ok: true });
 }

@@ -18,7 +18,9 @@ export function MetaEditor({
 }) {
   const [displayName, setDisplayName] = useState(initial?.display_name || "");
   const [description, setDescription] = useState(initial?.description || "");
+  const [detailedDescription, setDetailedDescription] = useState(initial?.detailed_description || "");
   const [tagsStr, setTagsStr] = useState((initial?.tags || []).join(", "));
+  const [n8nUrl, setN8nUrl] = useState(initial?.n8n_webhook_url || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +38,9 @@ export function MetaEditor({
         key: metaKey,
         display_name: displayName,
         description,
+        detailed_description: detailedDescription,
         tags,
+        n8n_webhook_url: n8nUrl,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -65,13 +69,29 @@ export function MetaEditor({
           />
         </label>
         <label className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
-          <span className="w-24 shrink-0 pt-2 text-sm font-medium text-[var(--muted)]">Description</span>
+          <span className="w-24 shrink-0 pt-2 text-sm font-medium text-[var(--muted)]">
+            Short
+            <span className="ml-1 text-[10px] uppercase opacity-60">1 line</span>
+          </span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What does this routine do?"
+            placeholder="One-liner: what does this routine do?"
             rows={2}
             className="flex-1 rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-base"
+          />
+        </label>
+        <label className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
+          <span className="w-24 shrink-0 pt-2 text-sm font-medium text-[var(--muted)]">
+            Details
+            <span className="ml-1 text-[10px] uppercase opacity-60">md ok</span>
+          </span>
+          <textarea
+            value={detailedDescription}
+            onChange={(e) => setDetailedDescription(e.target.value)}
+            placeholder={"Full task description. Steps, inputs, expected outputs, safety limits, on-failure behavior. Markdown is fine — cards render it collapsed by default."}
+            rows={8}
+            className="flex-1 rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2 font-mono text-sm leading-relaxed"
           />
         </label>
         <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
@@ -83,6 +103,22 @@ export function MetaEditor({
             className="flex-1 rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-base"
           />
         </label>
+        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+          <span className="w-24 shrink-0 text-sm font-medium text-[var(--muted)]">
+            n8n hook
+            <span className="ml-1 text-[10px] uppercase opacity-60">optional</span>
+          </span>
+          <input
+            type="url"
+            value={n8nUrl}
+            onChange={(e) => setN8nUrl(e.target.value)}
+            placeholder="https://n8n.example.com/webhook/abc123"
+            className="flex-1 rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2 font-mono text-sm"
+          />
+        </label>
+        <p className="pl-0 text-xs text-[var(--muted)] sm:pl-[6.5rem]">
+          Fire posts JSON to this URL: <code>{`{"event":"fire","label":"...","source":"dashboard","timestamp":"..."}`}</code>
+        </p>
         <div className="flex flex-wrap items-center gap-2">
           <button
             disabled={saving}

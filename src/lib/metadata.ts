@@ -5,7 +5,9 @@ import path from "node:path";
 export type RoutineMetadata = {
   display_name?: string;
   description?: string;
+  detailed_description?: string;
   tags?: string[];
+  n8n_webhook_url?: string;
 };
 
 export type MetadataStore = {
@@ -63,7 +65,12 @@ export async function setMeta(key: string, meta: RoutineMetadata): Promise<void>
   const clean: RoutineMetadata = {};
   if (meta.display_name?.trim()) clean.display_name = meta.display_name.trim();
   if (meta.description?.trim()) clean.description = meta.description.trim();
+  if (meta.detailed_description?.trim()) clean.detailed_description = meta.detailed_description.trim();
   if (meta.tags?.length) clean.tags = meta.tags;
+  if (meta.n8n_webhook_url?.trim()) {
+    const url = meta.n8n_webhook_url.trim();
+    if (/^https?:\/\//i.test(url)) clean.n8n_webhook_url = url;
+  }
   if (Object.keys(clean).length === 0) {
     delete store.items[key];
   } else {
