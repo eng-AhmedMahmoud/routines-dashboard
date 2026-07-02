@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { LaunchdAgent } from "@/lib/launchd";
 import type { CloudTrigger } from "@/lib/cloud";
 import type { RoutineMetadata } from "@/lib/metadata";
@@ -9,6 +9,13 @@ import { CloudCard } from "./cloud-card";
 
 type Tab = "all" | "local" | "cloud";
 type StatusFilter = "any" | "enabled" | "disabled" | "failing";
+
+type SelectionKey =
+  | { kind: "launchd"; label: string }
+  | { kind: "cloud"; id: string };
+
+const selKey = (s: SelectionKey): string =>
+  s.kind === "launchd" ? `launchd:${s.label}` : `cloud:${s.id}`;
 
 export function RoutinesView({
   initialAgents,
@@ -30,6 +37,9 @@ export function RoutinesView({
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("any");
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchFeedback, setBatchFeedback] = useState<string | null>(null);
   const [isRefreshing, startRefresh] = useTransition();
 
   const refresh = () => {
@@ -101,6 +111,121 @@ export function RoutinesView({
   const showCloud = cloudEnabled && tab !== "local";
   const tabs: Tab[] = cloudEnabled ? ["all", "local", "cloud"] : ["all"];
 
+  // Selection helpers.
+  const toggle = (key: SelectionKey) => {
+    const k = selKey(key);
+    setSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelection(new Set());
+  const selectAllVisible = () => {
+    const next = new Set<string>();
+    filteredAgents.forEach((a) => next.add(selKey({ kind: "launchd", label: a.label })));
+    filteredTriggers.forEach((t) => next.add(selKey({ kind: "cloud", id: t.id })));
+    setSelection(next);
+  };
+
+  const selectedItems = useMemo(() => {
+    const items: SelectionKey[] = [];
+    agents.forEach((a) => {
+      if (selection.has(selKey({ kind: "launchd", label: a.label }))) {
+        items.push({ kind: "launchd", label: a.label });
+      }
+    });
+    triggers.forEach((t) => {
+      if (selection.has(selKey({ kind: "cloud", id: t.id }))) {
+        items.push({ kind: "cloud", id: t.id });
+      }
+    });
+    return items;
+  }, [selection, agents, triggers]);
+
+  const runBatch = async (
+    op: "enable" | "disable" | "fire" | "delete",
+    confirmMsg?: string,
+  ) => {
+    if (selectedItems.length === 0) return;
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    setBatchBusy(true);
+    setBatchFeedback(null);
+
+    let ok = 0;
+    let fail = 0;
+    const errorSamples: string[] = [];
+
+    const perform = async (s: SelectionKey) => {
+      try {
+        if (s.kind === "launchd") {
+          if (op === "delete") return; // no-op — launchd has no delete API
+          if (op === "fire") {
+            const r = await fetch(`/api/launchd/${encodeURIComponent(s.label)}/fire`, {
+              method: "POST",
+            });
+            if (!r.ok) throw new Error(await r.text());
+          } else {
+            const r = await fetch(`/api/launchd/${encodeURIComponent(s.label)}/toggle`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ enabled: op === "enable" }),
+            });
+            if (!r.ok) throw new Error(await r.text());
+          }
+        } else {
+          if (op === "fire") {
+            const r = await fetch(`/api/cloud/${s.id}/fire`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+            });
+            if (!r.ok) throw new Error(await r.text());
+          } else if (op === "delete") {
+            const r = await fetch(`/api/cloud/${s.id}/delete`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+            });
+            if (!r.ok) throw new Error(await r.text());
+          } else {
+            const r = await fetch(`/api/cloud/${s.id}/toggle`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ enabled: op === "enable" }),
+            });
+            if (!r.ok) throw new Error(await r.text());
+          }
+        }
+        ok += 1;
+      } catch (e) {
+        fail += 1;
+        if (errorSamples.length < 3) errorSamples.push((e as Error).message.slice(0, 80));
+      }
+    };
+
+    // Cap concurrency at 4 to avoid hammering launchctl / the cloud API.
+    const queue = [...selectedItems];
+    const workers = Array.from({ length: Math.min(4, queue.length) }).map(async () => {
+      while (queue.length) {
+        const item = queue.shift();
+        if (item) await perform(item);
+      }
+    });
+    await Promise.all(workers);
+
+    setBatchBusy(false);
+    setBatchFeedback(
+      fail === 0
+        ? `✓ ${op} ${ok}/${selectedItems.length}`
+        : `${ok} ok, ${fail} failed — ${errorSamples.join(" | ")}`,
+    );
+    setTimeout(() => setBatchFeedback(null), 4000);
+    if (op === "delete") clearSelection();
+    refresh();
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -138,7 +263,7 @@ export function RoutinesView({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 fade-in">
+      <div className="flex flex-wrap items-center gap-2 fade-in">
         {statusChips.map((c) => (
           <button
             key={c.key}
@@ -149,7 +274,76 @@ export function RoutinesView({
             <span className="chip-count">{c.count}</span>
           </button>
         ))}
+        <button
+          onClick={selectAllVisible}
+          className="chip ml-auto"
+          title="Select every routine matching current filters"
+        >
+          Select visible
+        </button>
       </div>
+
+      {selection.size > 0 && (
+        <div className="batch-bar fade-in flex flex-wrap items-center gap-2 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/8 px-3 py-2">
+          <span className="text-sm font-medium">
+            <span className="text-[var(--accent)]">{selection.size}</span> selected
+          </span>
+          <span className="hidden text-xs text-[var(--muted)] sm:inline">
+            batch actions run in parallel (up to 4 at a time)
+          </span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button
+              disabled={batchBusy}
+              onClick={() => runBatch("fire")}
+              className="rounded border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--card-hover)] disabled:opacity-50"
+            >
+              Fire
+            </button>
+            <button
+              disabled={batchBusy}
+              onClick={() => runBatch("enable")}
+              className="rounded border border-[var(--green)]/40 px-3 py-1.5 text-sm font-medium text-[var(--green)] hover:bg-[var(--green)]/10 disabled:opacity-50"
+            >
+              Enable
+            </button>
+            <button
+              disabled={batchBusy}
+              onClick={() => runBatch("disable")}
+              className="rounded border border-[var(--amber)]/40 px-3 py-1.5 text-sm font-medium text-[var(--amber)] hover:bg-[var(--amber)]/10 disabled:opacity-50"
+            >
+              Disable
+            </button>
+            {cloudEnabled &&
+              selectedItems.some((s) => s.kind === "cloud") && (
+                <button
+                  disabled={batchBusy}
+                  onClick={() =>
+                    runBatch(
+                      "delete",
+                      `Delete ${selectedItems.filter((s) => s.kind === "cloud").length} cloud trigger(s)? This cannot be undone. (launchd items skipped.)`,
+                    )
+                  }
+                  className="rounded border border-[var(--red)]/40 px-3 py-1.5 text-sm font-medium text-[var(--red)] hover:bg-[var(--red)]/10 disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              )}
+            <button
+              onClick={clearSelection}
+              className="rounded border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] hover:text-[var(--text)]"
+            >
+              Clear
+            </button>
+          </div>
+          {batchFeedback && (
+            <span
+              className={`w-full text-sm ${batchFeedback.startsWith("✓") ? "text-[var(--green)]" : "text-[var(--red)]"}`}
+            >
+              {batchFeedback}
+            </span>
+          )}
+        </div>
+      )}
 
       {showLocal && (
         <Section
@@ -165,6 +359,8 @@ export function RoutinesView({
               meta={metadata[`launchd:${a.label}`]}
               onChange={refresh}
               onMetaChange={refreshMetadataOnly}
+              selected={selection.has(selKey({ kind: "launchd", label: a.label }))}
+              onToggleSelect={() => toggle({ kind: "launchd", label: a.label })}
             />
           ))}
         </Section>
@@ -184,6 +380,8 @@ export function RoutinesView({
               meta={metadata[`cloud:${t.id}`]}
               onChange={refresh}
               onMetaChange={refreshMetadataOnly}
+              selected={selection.has(selKey({ kind: "cloud", id: t.id }))}
+              onToggleSelect={() => toggle({ kind: "cloud", id: t.id })}
             />
           ))}
         </Section>
