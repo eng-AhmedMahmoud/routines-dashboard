@@ -117,6 +117,25 @@ Then in your run scripts:
 
 No terminal window pops up on scheduled runs. Set `CLAUDE_CL_DETACH=1` if you want fire-and-forget.
 
+### Chrome pre-flight for browser routines
+
+If your routine uses the `mcp__claude-in-chrome__*` tools (LinkedIn scraping, form automation, whatever), it will error `"not connected"` when the schedule fires and Chrome isn't running — a common failure mode at 9 AM when you haven't opened Chrome yet.
+
+`scripts/ensure-chrome.sh` (installed to `~/bin/`) launches Chrome via bundle id, waits for at least one window, and only then returns. Works even when Chrome is installed as `Chrome.app` (Chrome for Testing / Canary) rather than the standard `Google Chrome.app`.
+
+Install it and turn it on in the specific run scripts that need it:
+
+```bash
+cp scripts/ensure-chrome.sh ~/bin/ && chmod +x ~/bin/ensure-chrome.sh
+```
+
+```bash
+# in your run-*.sh, opt into pre-flight per routine:
+CLAUDE_CL_ENSURE_CHROME=1 "$HOME/bin/claude-cl.sh" "$PROJECT_DIR" "$PROMPT_FILE"
+```
+
+Preflight failure exits with code 2 — launchd records it and the dashboard's fire-outcome watcher fires a macOS notification. Routines that don't need Chrome (Gmail-only checks, git-only cross-post) leave the env var unset and are unaffected.
+
 ## How it works
 
 ```
